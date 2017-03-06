@@ -49,15 +49,15 @@ on init
 
 on early-boot
 # Define Motorola DBVC ATVC Property defaults (failsafe properties)
-    setprop ro.sys.atvc_allow_netmon_usb 0
-    setprop ro.sys.atvc_allow_netmon_ih 0
-    setprop ro.sys.atvc_allow_res_core 0
-    setprop ro.sys.atvc_allow_res_panic 0
-    setprop ro.sys.atvc_allow_all_adb 0
-    setprop ro.sys.atvc_allow_all_core 0
-    setprop ro.sys.atvc_allow_efem 0
-    setprop ro.sys.atvc_allow_bp_log 0
-    setprop ro.sys.atvc_allow_ap_mot_log 0
+    setprop ro.sys.atvc_allow_netmon_usb 1
+    setprop ro.sys.atvc_allow_netmon_ih 1
+    setprop ro.sys.atvc_allow_res_core 1
+    setprop ro.sys.atvc_allow_res_panic 1
+    setprop ro.sys.atvc_allow_all_adb 1
+    setprop ro.sys.atvc_allow_all_core 1
+    setprop ro.sys.atvc_allow_efem 1
+    setprop ro.sys.atvc_allow_bp_log 1
+    setprop ro.sys.atvc_allow_ap_mot_log 1
     setprop ro.sys.atvc_allow_simswap 0
 
 on charger
@@ -96,11 +96,11 @@ on start-charging
     start whisperd
     start qcom-post-boot
     # Prepare for charger mode
-    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ondemand
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor powersave
     write /sys/devices/system/cpu/cpu1/online 0
 
 on property:ro.modem.no_wdog_chk=1
-   write /sys/module/modem_8960/parameters/no_wdog_chk 1
+   write /sys/module/modem_8960/parameters/no_wdog_chk 0
 
     # Create PDS mount point
     mkdir /pds 0755 root root
@@ -108,11 +108,11 @@ on property:ro.modem.no_wdog_chk=1
 on fs
     # Mount modem FSG partition
     wait /dev/block/platform/msm_sdcc.1/by-name/fsg
-    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/fsg /fsg ro nosuid nodev barrier=0
+    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/fsg /fsg rw nosuid nodev barrier=1
 
     #Mount customize partion
     wait /dev/block/platform/msm_sdcc.1/by-name/customize
-    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/customize /customize ro discard nosuid nodev noatime nodiratime noexec
+    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/customize /customize rw discard nosuid nodev noatime nodiratime
 
     chown radio radio /dev/mot_hob_ram
     chmod 0660 /dev/mot_hob_ram
@@ -135,7 +135,7 @@ on fs
     # to speed up modem initialization
     wait /dev/block/platform/msm_sdcc.1/by-name/modem
     exec /system/bin/resize2fs /dev/block/platform/msm_sdcc.1/by-name/modem
-    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/modem /firmware ro nosuid nodev barrier=0
+    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/modem /firmware rw nosuid nodev barrier=1
     start bootmodem
 
     # Keeping following partitions outside fstab file. As user may not have
@@ -177,7 +177,7 @@ on post-fs
     wait /dev/block/platform/msm_sdcc.1/by-name/pds
     exec /system/bin/mount_pds.sh
 
-    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/system /system ro remount
+    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/system /system rw remount
 
 # Set default maximum of 1.5 GHz (peformance settings will change this if set by user)
     write /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq 1512000
@@ -372,9 +372,7 @@ on boot
     setprop net.tcp.buffersize.gprs    4096,8192,12288,4096,8192,12288
     setprop net.tcp.buffersize.lte     524288,1048576,4194304,262144,524288,2097152
     setprop net.tcp.buffersize.cdma    4096,12288,24576,4096,12288,24576
-    setprop net.tcp.buffersize.evdo    131072,262144,524288,4096,16384,262144
-    setprop net.tcp.buffersize.evdo_b  131072,262144,704512,4096,16384,262144
-
+    
 on post-fs-data
    setprop installd.post_fs_data_ready 1
 
@@ -450,13 +448,13 @@ service qcamerasvr /system/bin/mm-qcamera-daemon
         group camera system inet input graphics net_bt_stack
 
 service gpsone_daemon /system/bin/gpsone_daemon
-    class late_start
+    class main
     user gps
     group gps inet net_raw qcom_diag
 
 #start GNSS/Sensor interface daemon
 service gsiff_daemon /system/bin/gsiff_daemon
-    class late_start
+    class main
     user system
     group gps qcom_oncrpc net_raw
 
@@ -464,7 +462,6 @@ service thermald /system/bin/thermald
    class main
    user root
    group root
-   disabled
 
 on property:qcom.thermal=thermald
     start thermald
@@ -472,7 +469,6 @@ on property:qcom.thermal=thermald
 service mpdecision /system/bin/mpdecision --no_sleep --avg_comp
    user root
    group root system
-   disabled
 
 service whisperd /system/bin/whisperd /dev/ttyHS1
     class core
@@ -486,7 +482,7 @@ service qrngd /system/bin/qrngd -f
     group root
 
 service qseecomd /system/bin/qseecomd
-    class late_start
+    class main
     user system
     group system
 
@@ -506,7 +502,7 @@ service atvc_core /system/bin/dbvc_atvc_property_set
     oneshot
 
 service atvc /system/bin/dbvc_atvc_property_set
-    class late_start
+    class main
     user mot_atvc
     group mot_tpapi
     oneshot
@@ -526,7 +522,7 @@ on property:persist.sys.qc.sub.rstrtlvl=*
     write /sys/module/subsystem_restart/parameters/restart_level ${persist.sys.qc.sub.rstrtlvl}
 
 service time_daemon /system/bin/time_daemon
-   class late_start
+   class main
    user root
    group root
 
@@ -542,13 +538,12 @@ on property:persist.log.aplogd.enable=0
 
 service aplogd /system/bin/aplogd
     class main
-    #user log
-    #group log system sdcard_rw sdcard_r media_rw mount
+    user log
+    group log system sdcard_rw sdcard_r media_rw mount
     # The user and group definitions above are intentionally disabled and left
     # only as documentation. It actually starts as root and immediately drops
     # to log plus those groups after preserving CAP_SYS_ADMIN, which is required
     # for kernel logging.
-    disabled
 
 on property:persist.sys.diag_mdlog.on=1
     start diag_mdlog
@@ -561,7 +556,6 @@ service diag_mdlog /system/bin/diag_mdlog-wrap
     socket mdlog_cmd stream 0660 system diag
     user log
     group log sdcard_rw sdcard_r media_rw qcom_diag
-    disabled
 
 on property:ro.debuggable=1
    chmod 0775 /sys/kernel/debug
@@ -583,7 +577,6 @@ on property:ro.secure=0
 service ftmipcd /system/bin/ftmipcd
     user radio
     group radio inet qcom_diag
-    disabled
     oneshot
 
 on property:ro.bootmode=factory
@@ -605,19 +598,19 @@ service stop_fd  /system/bin/sh /system/bin/am broadcast -a  com.motorola.fastdo
 
 #Trigger FastDormancy service start when network type is changed to UMTS
 on property:gsm.network.type="UMTS"
-    start start_fd
+    stop start_fd
 
 on property:gsm.network.type="HSDPA"
-    start start_fd
+    stop start_fd
 
 on property:gsm.network.type="HSUPA"
-    start start_fd
+    stop start_fd
 
 on property:gsm.network.type="HSPA"
-    start start_fd
+    stop start_fd
 
 on property:gsm.network.type="HSPAP"
-    start start_fd
+    stop start_fd
 
 #Trigger FastDormancy service stop when network is unknow or CDMA
 #GSM, GPRS, EDGE, and HSPAP is not handled in order to avoid the service to be started and stopped back and force.
@@ -650,24 +643,21 @@ on property:gsm.network.type="LTE"
 
 # DHCP service for Ethernet
 service dhcpcd_eth0 /system/bin/dhcpcd -ABLKG
-    class late_start
-    disabled
+    class main
     oneshot
 
 service iprenew_eth0 /system/bin/dhcpcd -nBK
-    class late_start
-    disabled
+    class main
     oneshot
 
 service bootmodem /system/bin/bootmodem
     class main
     user shell
     group log
-    disabled
     oneshot
 
 service wcnss-service /system/bin/wcnss_service
-    class late_start
+    class main
     user system
     group system wifi
     oneshot
@@ -681,7 +671,6 @@ service mmi-boot-sh /system/bin/logwrapper /system/bin/sh /init.mmi.boot.sh
 service mmi-touch-sh /system/bin/logwrapper /system/bin/sh /init.mmi.touch.sh
     user root
     oneshot
-    disabled
 
 on boot
     start thermald
@@ -692,7 +681,7 @@ on property:installd.post_fs_data_ready=1
 
 # Disable BAM Adaptive Timer when Tethering is on.
 on property:net.tethering.on=1
-   write /sys/module/bam_dmux/parameters/adaptive_timer_enabled 0
+   write /sys/module/bam_dmux/parameters/adaptive_timer_enabled 1
 
 # Enable BAM Adaptive Timer when Tethering is off.
 on property:net.tethering.on=0
@@ -719,8 +708,7 @@ service mmi-ril-daemon /system/bin/rild
     group radio cache inet misc audio sdcard_rw qcom_oncrpc qcom_diag log net_raw diag
 
 # bugreport
-service bugreport /system/bin/dumpstate -d -p -B \
+service bugreport /system/bin/dumpstate -d -p -B
         -o /data/data/com.android.shell/files/bugreports/bugreport
     class main
-    disabled
     oneshot
